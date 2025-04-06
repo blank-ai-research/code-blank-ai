@@ -50,15 +50,24 @@ const Index = () => {
     analyzeRepo();
   }, []);
 
-  const handleSelectFile = (file: FileItem) => {
+  const handleSelectFile = async (file: FileItem) => {
     if (file.type !== 'file') return;
     
     setSelectedFile(file);
     
     // Convert file content to code lines with blanks
     if (file.content) {
-      const analyzedCode = analyzeCodeForBlanks(file.content, file.language || 'plaintext', userSkillLevel);
-      setCodeLines(analyzedCode);
+      try {
+        const analyzedCode = await analyzeCodeForBlanks(
+          file.content, 
+          file.language || 'plaintext', 
+          userSkillLevel
+        );
+        setCodeLines(analyzedCode);
+      } catch (error) {
+        console.error("Error analyzing code:", error);
+        setCodeLines([]);
+      }
     }
   };
 
@@ -66,17 +75,21 @@ const Index = () => {
     setSidebarTab(tab);
   };
 
-  const handleChangeSkillLevel = (level: 'beginner' | 'intermediate' | 'advanced') => {
+  const handleChangeSkillLevel = async (level: 'beginner' | 'intermediate' | 'advanced') => {
     setUserSkillLevel(level);
     
     // Re-analyze current file with new skill level
     if (selectedFile?.content) {
-      const analyzedCode = analyzeCodeForBlanks(
-        selectedFile.content, 
-        selectedFile.language || 'plaintext', 
-        level
-      );
-      setCodeLines(analyzedCode);
+      try {
+        const analyzedCode = await analyzeCodeForBlanks(
+          selectedFile.content, 
+          selectedFile.language || 'plaintext', 
+          level
+        );
+        setCodeLines(analyzedCode);
+      } catch (error) {
+        console.error("Error re-analyzing code with new skill level:", error);
+      }
     }
   };
 
@@ -101,8 +114,13 @@ const Index = () => {
         selectedFile.content = generatedCode;
         
         // Analyze the new code for blanks
-        const analyzedCode = analyzeCodeForBlanks(generatedCode, language, userSkillLevel);
-        setCodeLines(analyzedCode);
+        try {
+          const analyzedCode = await analyzeCodeForBlanks(generatedCode, language, userSkillLevel);
+          setCodeLines(analyzedCode);
+        } catch (error) {
+          console.error("Error analyzing generated code:", error);
+          setCodeLines([]);
+        }
       }
       
       toast({

@@ -28,7 +28,7 @@ interface CodeEditorProps {
   onChange?: (code: CodeLine[]) => void;
 }
 
-const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code, onChange }) => {
+const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code = [], onChange }) => {
   const [activeBlank, setActiveBlank] = useState<string | null>(null);
   const [hintPosition, setHintPosition] = useState<{ top: number; left: number } | null>(null);
   const [activeHint, setActiveHint] = useState<any>(null);
@@ -155,6 +155,9 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code, onCha
     );
   };
 
+  // Ensure code is an array before trying to map over it
+  const codeArray = Array.isArray(code) ? code : [];
+
   return (
     <div className="h-full relative border rounded-md overflow-hidden" ref={editorRef}>
       <div className="px-3 py-2 border-b text-sm flex items-center bg-muted/40">
@@ -164,7 +167,11 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code, onCha
         </span>
       </div>
       <div className="editor-bg h-[calc(100%-2.5rem)] overflow-auto p-1 font-mono text-sm">
-        {code.map((line, index) => renderLine(line, index))}
+        {codeArray.length > 0 ? (
+          codeArray.map((line, index) => renderLine(line, index))
+        ) : (
+          <div className="p-4 text-gray-500">No code to display</div>
+        )}
       </div>
       
       {activeBlank && hintPosition && activeHint && (

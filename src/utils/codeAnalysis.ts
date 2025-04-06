@@ -1,8 +1,26 @@
 
 import { v4 as uuidv4 } from 'uuid';
 
+// Define CodeLine interface for export
+export interface CodeLine {
+  lineNumber: number;
+  content: string;
+  blanks?: Array<{
+    id: string;
+    start: number;
+    end: number;
+    hint: {
+      title: string;
+      docs: string;
+      logic?: string;
+      example?: string;
+      docLink?: string;
+    };
+  }>;
+}
+
 // Enhanced code analysis that combines regex patterns with LLM-based analysis
-export const analyzeCodeForBlanks = async (code: string, language: string, userSkillLevel = 'intermediate') => {
+export const analyzeCodeForBlanks = async (code: string, language: string, userSkillLevel = 'intermediate'): Promise<CodeLine[]> => {
   const lines = code.split('\n');
   const result = [];
 
@@ -258,7 +276,7 @@ export async function retrieveDocumentation(feature: string, language: string) {
 }
 
 // Mock function to simulate AI code generation
-export const generateCodeFromPrompt = async (prompt: string, language: string) => {
+export const generateCodeFromPrompt = async (prompt: string, language: string): Promise<string> => {
   // In a real implementation, this would call an LLM API
   await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate API latency
   
