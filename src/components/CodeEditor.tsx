@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import HintPopover from './HintPopover';
+import { retrieveDocumentation } from '@/utils/codeAnalysis';
 
 interface CodeLine {
   lineNumber: number;
@@ -15,6 +16,7 @@ interface CodeLine {
       docs: string;
       logic?: string;
       example?: string;
+      docLink?: string;
     };
   }>;
 }
@@ -32,7 +34,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code, onCha
   const [activeHint, setActiveHint] = useState<any>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
-  const handleBlankClick = (lineIndex: number, blank: any, event: React.MouseEvent) => {
+  const handleBlankClick = async (lineIndex: number, blank: any, event: React.MouseEvent) => {
     const rect = (event.target as HTMLElement).getBoundingClientRect();
     const editorRect = editorRef.current?.getBoundingClientRect();
     
@@ -45,7 +47,29 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code, onCha
     }
     
     setActiveBlank(blank.id);
-    setActiveHint(blank.hint);
+    
+    // Enhanced hint with retrieved documentation if possible
+    let enhancedHint = {...blank.hint};
+    
+    try {
+      // Try to get more detailed documentation
+      if (blank.hint.title) {
+        const docKey = blank.hint.title.toLowerCase().replace(/\s+/g, '-');
+        const additionalDocs = await retrieveDocumentation(docKey, language);
+        
+        if (additionalDocs) {
+          enhancedHint = {
+            ...enhancedHint,
+            docs: additionalDocs.description || enhancedHint.docs,
+            docLink: additionalDocs.mdn_link || additionalDocs.docs_link
+          };
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching additional documentation:', error);
+    }
+    
+    setActiveHint(enhancedHint);
   };
 
   const closeHint = () => {
@@ -100,8 +124,10 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code, onCha
         <span 
           key={`blank-${blank.id}`}
           className={cn(
-            "code-blank",
-            activeBlank === blank.id && "bg-blue-300 dark:bg-blue-800"
+            "code-blank cursor-pointer px-1 rounded",
+            activeBlank === blank.id 
+              ? "bg-blue-300 dark:bg-blue-800" 
+              : "bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/40"
           )}
           onClick={(e) => handleBlankClick(index, blank, e)}
         >
@@ -130,14 +156,14 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code, onCha
   };
 
   return (
-    <div className="h-full relative" ref={editorRef}>
-      <div className="px-2 py-1 border-b text-sm flex items-center">
+    <div className="h-full relative border rounded-md overflow-hidden" ref={editorRef}>
+      <div className="px-3 py-2 border-b text-sm flex items-center bg-muted/40">
         <span className="font-medium">{fileName}</span>
         <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">
           {language.toUpperCase()}
         </span>
       </div>
-      <div className="editor-bg h-[calc(100%-2rem)] overflow-auto">
+      <div className="editor-bg h-[calc(100%-2.5rem)] overflow-auto p-1 font-mono text-sm">
         {code.map((line, index) => renderLine(line, index))}
       </div>
       
