@@ -1,3 +1,4 @@
+
 import { v4 as uuidv4 } from 'uuid';
 
 // Define CodeLine interface for export
@@ -24,60 +25,6 @@ export interface Documentation {
   description?: string;
   docs_link?: string;
   mdn_link?: string;
-  examples?: string[];
-}
-
-// Define DocMetadata interface
-export interface DocMetadata {
-  language: string;
-  source: string;
-  type: 'syntax' | 'example' | 'explanation' | 'hint';
-  topic?: string;
-}
-
-// Service and telemetry types
-export interface TelemetryEvent {
-  timestamp: number;
-  type: 'error' | 'warning' | 'info';
-  service: ServiceType;
-  message: string;
-  metadata?: Record<string, any>;
-}
-
-export interface ServiceMetrics {
-  totalCalls: number;
-  successfulCalls: number;
-  failedCalls: number;
-  averageLatency: number;
-  lastError?: Error;
-  lastSuccessful?: number;
-}
-
-export type ServiceType = 'vectorStore' | 'openai' | 'documentation';
-
-export interface ServiceHealth {
-  healthy: boolean;
-  metrics: ServiceMetrics;
-  recentEvents: TelemetryEvent[];
-}
-
-export interface ServiceState {
-  vectorStore: boolean;
-  documentation: boolean;
-  lastError?: Error;
-  retryCount: number;
-}
-
-// Vector store types
-export interface VectorDocument {
-  content: string;
-  metadata: DocMetadata;
-}
-
-export interface VectorQueryResult {
-  content: string;
-  metadata: DocMetadata;
-  score?: number;
 }
 
 // Language patterns for code analysis
@@ -100,6 +47,15 @@ export const codePatterns = {
         logic: 'Variable declarations use the keywords "const", "let", or "var" followed by a name and an optional initialization.',
         example: 'const price = 10;\nlet quantity = 5;'
       }
+    },
+    {
+      regex: /\b(if|else if|while|for)\s*\(([^)]+)\)\s*{/g,
+      title: 'Control Flow',
+      hint: {
+        docs: 'Control flow statements allow you to control the order in which statements are executed based on specified conditions.',
+        logic: 'Control flow statements typically involve a condition expression in parentheses and a block of code to execute if the condition is met.',
+        example: 'if (age >= 18) {\n  console.log("Adult");\n} else {\n  console.log("Minor");\n}'
+      }
     }
   ],
   typescript: [
@@ -111,6 +67,15 @@ export const codePatterns = {
         logic: 'Types and interfaces define the shape of objects, specifying property names and their expected types.',
         example: 'interface User {\n  id: number;\n  name: string;\n  email?: string;\n}'
       }
+    },
+    {
+      regex: /([a-zA-Z0-9_]+)\s*:\s*([a-zA-Z0-9_<>[\]|&]+)/g,
+      title: 'Type Annotation',
+      hint: {
+        docs: 'Type annotations specify the expected type of a variable, parameter, or return value.',
+        logic: 'A colon followed by a type specification indicates the expected type of the preceding identifier.',
+        example: 'function greet(name: string): string {\n  return `Hello, ${name}!`;\n}'
+      }
     }
   ],
   python: [
@@ -121,6 +86,15 @@ export const codePatterns = {
         docs: 'In Python, functions are defined using the "def" keyword, followed by the function name and parameters.',
         logic: 'Python functions can specify type hints for parameters and return values using the arrow syntax.',
         example: 'def calculate_total(price: float, quantity: int) -> float:\n    return price * quantity'
+      }
+    },
+    {
+      regex: /\bclass\s+([a-zA-Z0-9_]+)(?:\(([^)]*)\))?\s*:/g,
+      title: 'Class Definition',
+      hint: {
+        docs: 'Classes in Python are defined using the "class" keyword and can inherit from other classes.',
+        logic: 'A class serves as a blueprint for creating objects with shared methods and properties.',
+        example: 'class Person:\n    def __init__(self, name):\n        self.name = name\n\n    def greet(self):\n        return f"Hello, {self.name}!"'
       }
     }
   ]
