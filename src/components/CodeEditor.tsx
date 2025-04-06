@@ -2,7 +2,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import HintPopover from './HintPopover';
-import { retrieveDocumentation } from '@/utils/codeAnalysis';
 
 interface CodeLine {
   lineNumber: number;
@@ -16,7 +15,6 @@ interface CodeLine {
       docs: string;
       logic?: string;
       example?: string;
-      docLink?: string;
     };
   }>;
 }
@@ -28,13 +26,13 @@ interface CodeEditorProps {
   onChange?: (code: CodeLine[]) => void;
 }
 
-const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code = [], onChange }) => {
+const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code, onChange }) => {
   const [activeBlank, setActiveBlank] = useState<string | null>(null);
   const [hintPosition, setHintPosition] = useState<{ top: number; left: number } | null>(null);
   const [activeHint, setActiveHint] = useState<any>(null);
   const editorRef = useRef<HTMLDivElement>(null);
 
-  const handleBlankClick = async (lineIndex: number, blank: any, event: React.MouseEvent) => {
+  const handleBlankClick = (lineIndex: number, blank: any, event: React.MouseEvent) => {
     const rect = (event.target as HTMLElement).getBoundingClientRect();
     const editorRect = editorRef.current?.getBoundingClientRect();
     
@@ -47,29 +45,7 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code = [], 
     }
     
     setActiveBlank(blank.id);
-    
-    // Enhanced hint with retrieved documentation if possible
-    let enhancedHint = {...blank.hint};
-    
-    try {
-      // Try to get more detailed documentation
-      if (blank.hint.title) {
-        const docKey = blank.hint.title.toLowerCase().replace(/\s+/g, '-');
-        const additionalDocs = await retrieveDocumentation(docKey, language);
-        
-        if (additionalDocs) {
-          enhancedHint = {
-            ...enhancedHint,
-            docs: additionalDocs.description || enhancedHint.docs,
-            docLink: additionalDocs.mdn_link || additionalDocs.docs_link
-          };
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching additional documentation:', error);
-    }
-    
-    setActiveHint(enhancedHint);
+    setActiveHint(blank.hint);
   };
 
   const closeHint = () => {
@@ -124,10 +100,8 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code = [], 
         <span 
           key={`blank-${blank.id}`}
           className={cn(
-            "code-blank cursor-pointer px-1 rounded",
-            activeBlank === blank.id 
-              ? "bg-blue-300 dark:bg-blue-800" 
-              : "bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/40"
+            "code-blank",
+            activeBlank === blank.id && "bg-blue-300 dark:bg-blue-800"
           )}
           onClick={(e) => handleBlankClick(index, blank, e)}
         >
@@ -155,23 +129,16 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code = [], 
     );
   };
 
-  // Ensure code is an array before trying to map over it
-  const codeArray = Array.isArray(code) ? code : [];
-
   return (
-    <div className="h-full relative border rounded-md overflow-hidden" ref={editorRef}>
-      <div className="px-3 py-2 border-b text-sm flex items-center bg-muted/40">
+    <div className="h-full relative" ref={editorRef}>
+      <div className="px-2 py-1 border-b text-sm flex items-center">
         <span className="font-medium">{fileName}</span>
         <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">
           {language.toUpperCase()}
         </span>
       </div>
-      <div className="editor-bg h-[calc(100%-2.5rem)] overflow-auto p-1 font-mono text-sm">
-        {codeArray.length > 0 ? (
-          codeArray.map((line, index) => renderLine(line, index))
-        ) : (
-          <div className="p-4 text-gray-500">No code to display</div>
-        )}
+      <div className="editor-bg h-[calc(100%-2rem)] overflow-auto">
+        {code.map((line, index) => renderLine(line, index))}
       </div>
       
       {activeBlank && hintPosition && activeHint && (

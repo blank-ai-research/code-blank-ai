@@ -50,24 +50,15 @@ const Index = () => {
     analyzeRepo();
   }, []);
 
-  const handleSelectFile = async (file: FileItem) => {
+  const handleSelectFile = (file: FileItem) => {
     if (file.type !== 'file') return;
     
     setSelectedFile(file);
     
     // Convert file content to code lines with blanks
     if (file.content) {
-      try {
-        const analyzedCode = await analyzeCodeForBlanks(
-          file.content, 
-          file.language || 'plaintext', 
-          userSkillLevel
-        );
-        setCodeLines(analyzedCode);
-      } catch (error) {
-        console.error("Error analyzing code:", error);
-        setCodeLines([]);
-      }
+      const analyzedCode = analyzeCodeForBlanks(file.content, file.language || 'plaintext', userSkillLevel);
+      setCodeLines(analyzedCode);
     }
   };
 
@@ -75,21 +66,17 @@ const Index = () => {
     setSidebarTab(tab);
   };
 
-  const handleChangeSkillLevel = async (level: 'beginner' | 'intermediate' | 'advanced') => {
+  const handleChangeSkillLevel = (level: 'beginner' | 'intermediate' | 'advanced') => {
     setUserSkillLevel(level);
     
     // Re-analyze current file with new skill level
     if (selectedFile?.content) {
-      try {
-        const analyzedCode = await analyzeCodeForBlanks(
-          selectedFile.content, 
-          selectedFile.language || 'plaintext', 
-          level
-        );
-        setCodeLines(analyzedCode);
-      } catch (error) {
-        console.error("Error re-analyzing code with new skill level:", error);
-      }
+      const analyzedCode = analyzeCodeForBlanks(
+        selectedFile.content, 
+        selectedFile.language || 'plaintext', 
+        level
+      );
+      setCodeLines(analyzedCode);
     }
   };
 
@@ -114,13 +101,8 @@ const Index = () => {
         selectedFile.content = generatedCode;
         
         // Analyze the new code for blanks
-        try {
-          const analyzedCode = await analyzeCodeForBlanks(generatedCode, language, userSkillLevel);
-          setCodeLines(analyzedCode);
-        } catch (error) {
-          console.error("Error analyzing generated code:", error);
-          setCodeLines([]);
-        }
+        const analyzedCode = analyzeCodeForBlanks(generatedCode, language, userSkillLevel);
+        setCodeLines(analyzedCode);
       }
       
       toast({
