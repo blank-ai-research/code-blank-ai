@@ -1,8 +1,9 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import HintPopover from './HintPopover';
-import { retrieveDocumentation } from '@/utils/codeAnalysis';
+import { getDocumentation } from '@/utils/codeAnalysis';
+import { Skeleton } from './ui/skeleton';
+import { highlightCode, highlightInline } from '@/utils/syntaxHighlighting';
 
 interface CodeLine {
   lineNumber: number;
@@ -25,51 +26,77 @@ interface CodeEditorProps {
   fileName: string;
   language: string;
   code: CodeLine[];
+  skillLevel?: 'beginner' | 'intermediate' | 'advanced';
   onChange?: (code: CodeLine[]) => void;
 }
 
-const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code = [], onChange }) => {
+const CodeEditor: React.FC<CodeEditorProps> = ({ 
+  fileName, 
+  language, 
+  code = [], 
+  skillLevel = 'intermediate',
+  onChange 
+}) => {
   const [activeBlank, setActiveBlank] = useState<string | null>(null);
   const [hintPosition, setHintPosition] = useState<{ top: number; left: number } | null>(null);
   const [activeHint, setActiveHint] = useState<any>(null);
+  const [isLoadingHint, setIsLoadingHint] = useState(false);
+  const [highlightedCode, setHighlightedCode] = useState<string[]>([]);
   const editorRef = useRef<HTMLDivElement>(null);
+
+  // Initialize syntax highlighting
+  useEffect(() => {
+    const highlight = async () => {
+      const highlighted = await Promise.all(
+        code.map(line => highlightInline(line.content, language))
+      );
+      setHighlightedCode(highlighted);
+    };
+    highlight();
+  }, [code, language]);
 
   const handleBlankClick = async (lineIndex: number, blank: any, event: React.MouseEvent) => {
     const rect = (event.target as HTMLElement).getBoundingClientRect();
     const editorRect = editorRef.current?.getBoundingClientRect();
     
     if (editorRect) {
-      // Position hint to the right of the blank
+      // Calculate optimal position for hint
+      const spaceRight = window.innerWidth - (rect.right - editorRect.left);
+      const spaceBelow = window.innerHeight - (rect.bottom - editorRect.top);
+      
+      // Position hint based on available space
       setHintPosition({
-        top: rect.top - editorRect.top,
-        left: rect.right - editorRect.left + 10
+        top: spaceBelow > 300 ? rect.bottom - editorRect.top : rect.top - editorRect.top - 300,
+        left: spaceRight > 400 ? rect.right - editorRect.left + 10 : rect.left - editorRect.left - 410
       });
     }
     
     setActiveBlank(blank.id);
-    
-    // Enhanced hint with retrieved documentation if possible
-    let enhancedHint = {...blank.hint};
+    setIsLoadingHint(true);
     
     try {
-      // Try to get more detailed documentation
+      const enhancedHint = {...blank.hint};
+      
       if (blank.hint.title) {
-        const docKey = blank.hint.title.toLowerCase().replace(/\s+/g, '-');
-        const additionalDocs = await retrieveDocumentation(docKey, language);
+        const additionalDocs = await getDocumentation(
+          blank.hint.title.toLowerCase().replace(/\s+/g, '-'),
+          language
+        );
         
         if (additionalDocs) {
-          enhancedHint = {
-            ...enhancedHint,
-            docs: additionalDocs.description || enhancedHint.docs,
-            docLink: additionalDocs.mdn_link || additionalDocs.docs_link
-          };
+          enhancedHint.docs = additionalDocs.description || enhancedHint.docs;
+          enhancedHint.docLink = additionalDocs.docs_link;
+          enhancedHint.examples = additionalDocs.examples || [enhancedHint.example];
         }
       }
+      
+      setActiveHint(enhancedHint);
     } catch (error) {
-      console.error('Error fetching additional documentation:', error);
+      console.error('Error fetching documentation:', error);
+      setActiveHint(blank.hint);
+    } finally {
+      setIsLoadingHint(false);
     }
-    
-    setActiveHint(enhancedHint);
   };
 
   const closeHint = () => {
@@ -99,9 +126,14 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code = [], 
   const renderLine = (line: CodeLine, index: number) => {
     if (!line.blanks || line.blanks.length === 0) {
       return (
-        <div key={index} className="code-line">
-          <span className="code-line-number">{line.lineNumber}</span>
-          <span>{line.content}</span>
+        <div key={index} className="code-line group relative hover:bg-editor-line/30">
+          <span className="code-line-number text-gray-500 select-none pr-4 border-r border-editor-gutter">
+            {line.lineNumber}
+          </span>
+          <span 
+            className="ml-4"
+            dangerouslySetInnerHTML={{ __html: highlightedCode[index] || line.content }}
+          />
         </div>
       );
     }
@@ -110,26 +142,32 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code = [], 
     let lastEnd = 0;
 
     line.blanks.forEach((blank, blankIndex) => {
-      // Add text before blank
+      // Add highlighted text before blank
       if (blank.start > lastEnd) {
+        const beforeText = line.content.substring(lastEnd, blank.start);
         segments.push(
-          <span key={`text-${blankIndex}`}>
-            {line.content.substring(lastEnd, blank.start)}
-          </span>
+          <span 
+            key={`text-${blankIndex}`}
+            dangerouslySetInnerHTML={{ 
+              __html: highlightedCode[index]?.substring(lastEnd, blank.start) || beforeText 
+            }}
+          />
         );
       }
 
-      // Add the blank
+      // Add the blank with enhanced styling
       segments.push(
         <span 
           key={`blank-${blank.id}`}
           className={cn(
-            "code-blank cursor-pointer px-1 rounded",
+            "code-blank relative cursor-pointer rounded transition-all duration-200",
+            "before:absolute before:inset-0 before:bg-editor-blank before:opacity-20 before:rounded",
             activeBlank === blank.id 
-              ? "bg-blue-300 dark:bg-blue-800" 
-              : "bg-yellow-100 dark:bg-yellow-900/30 hover:bg-yellow-200 dark:hover:bg-yellow-800/40"
+              ? "bg-blue-500/20 text-blue-700 dark:text-blue-300 px-2 -mx-2" 
+              : "hover:bg-yellow-500/10 hover:text-yellow-700 dark:hover:text-yellow-300"
           )}
           onClick={(e) => handleBlankClick(index, blank, e)}
+          title="Click to see hint"
         >
           {line.content.substring(blank.start, blank.end)}
         </span>
@@ -138,52 +176,67 @@ const CodeEditor: React.FC<CodeEditorProps> = ({ fileName, language, code = [], 
       lastEnd = blank.end;
     });
 
-    // Add any remaining text
+    // Add remaining highlighted text
     if (lastEnd < line.content.length) {
+      const afterText = line.content.substring(lastEnd);
       segments.push(
-        <span key="text-end">
-          {line.content.substring(lastEnd)}
-        </span>
+        <span 
+          key="text-end"
+          dangerouslySetInnerHTML={{ 
+            __html: highlightedCode[index]?.substring(lastEnd) || afterText 
+          }}
+        />
       );
     }
 
     return (
-      <div key={index} className="code-line">
-        <span className="code-line-number">{line.lineNumber}</span>
-        {segments}
+      <div key={index} className="code-line group relative hover:bg-editor-line/30">
+        <span className="code-line-number text-gray-500 select-none pr-4 border-r border-editor-gutter">
+          {line.lineNumber}
+        </span>
+        <span className="ml-4">{segments}</span>
       </div>
     );
   };
 
-  // Ensure code is an array before trying to map over it
-  const codeArray = Array.isArray(code) ? code : [];
-
   return (
-    <div className="h-full relative border rounded-md overflow-hidden" ref={editorRef}>
-      <div className="px-3 py-2 border-b text-sm flex items-center bg-muted/40">
-        <span className="font-medium">{fileName}</span>
-        <span className="ml-2 text-xs bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded">
-          {language.toUpperCase()}
-        </span>
+    <div className="h-full relative border rounded-md overflow-hidden bg-editor" ref={editorRef}>
+      <div className="px-3 py-2 border-b text-sm flex items-center justify-between bg-editor-gutter">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-white">{fileName}</span>
+          <span className="text-xs px-2 py-0.5 rounded bg-editor-line text-white/80">
+            {language.toUpperCase()}
+          </span>
+        </div>
+        <span className="text-xs text-white/60">Mode: {skillLevel}</span>
       </div>
-      <div className="editor-bg h-[calc(100%-2.5rem)] overflow-auto p-1 font-mono text-sm">
-        {codeArray.length > 0 ? (
-          codeArray.map((line, index) => renderLine(line, index))
+      
+      <div className="editor-content h-[calc(100%-2.5rem)] overflow-auto p-4 font-mono text-sm leading-6 text-white/90">
+        {code.length > 0 ? (
+          code.map((line, index) => renderLine(line, index))
         ) : (
           <div className="p-4 text-gray-500">No code to display</div>
         )}
       </div>
       
-      {activeBlank && hintPosition && activeHint && (
+      {activeBlank && hintPosition && (isLoadingHint || activeHint) && (
         <div 
+          className="fixed z-50 animate-in fade-in-0 zoom-in-95"
           style={{ 
             position: 'absolute', 
             top: `${hintPosition.top}px`, 
             left: `${hintPosition.left}px`,
-            zIndex: 10
           }}
         >
-          <HintPopover hint={activeHint} onClose={closeHint} />
+          {isLoadingHint ? (
+            <div className="bg-background border rounded-lg shadow-lg p-4 w-80 md:w-96">
+              <Skeleton className="h-6 w-3/4 mb-4" />
+              <Skeleton className="h-24 w-full mb-2" />
+              <Skeleton className="h-4 w-1/2" />
+            </div>
+          ) : (
+            <HintPopover hint={activeHint} onClose={closeHint} />
+          )}
         </div>
       )}
     </div>
